@@ -5,13 +5,10 @@ SAMPLES = sorted(list(set([os.path.basename(f).split('_')[0] for f in glob.glob(
 
 rule all:
     input:
-         expand("results/fastp/{sample}_fastp.json", sample=SAMPLES),
-         expand("results/bracken/{sample]_bracken.tsv", sample=SAMPLES),
-         expand("results/bracken/{sample]_cazy.tsv", sample=SAMPLES),
-         "results/taxa_coda_final.csv",
-         "results/cazy_coda_final.csv",
-         "results/target_gh_final.csv",
-         "results/taxa_coda_final.csv",
+        expand("results/fastp/{sample}_fastp.json", sample=SAMPLES),
+        expand("results/bracken/{sample}_bracken.tsv", sample=SAMPLES),
+        expand("results/diamond/{sample}_cazy.tsv", sample=SAMPLES),
+        "results/taxa_coda_final.csv",
         "results/cazy_coda_final.csv",
         "results/target_gh_final.csv",
         "results/taxon_cazy_integration.csv",
@@ -23,19 +20,32 @@ rule all:
 
 rule fastp:
     input:
-         r1 = "raw_data/{sample}_1.fastq.gz",
-         r2 = "raw_data/{sample}_2.fastq.gz"
+        r1 = "raw_data/{sample}_1.fastq.gz",
+        r2 = "raw_data/{sample}_2.fastq.gz"
     output:
-         report = "results/kraken2/{sample}_kraken2.report",
-         output = temp("results/kraken2/{sample}_kraken2.output")
-         threads: 8
+        r1 = temp("results/qc/{sample}_1.trimmed.fastq.gz"),
+        r2 = temp("results/qc/{sample}_2.trimmed.fastq.gz"),
+        json = "results/fastp/{sample}_fastp.json",
+        html = "results/fastp/{sample}_fastp.html"
+    threads: 4
+    shell:
+        "fastp -i {input.r1} -I {input.r2} -o {output.r1} -O {output.r2} -j {output.json} -h {output.html} -w {threads}"
+
+rule kraken2:
+    input:
+        r1 = "results/qc/{sample}_1.trimmed.fastq.gz",
+        r2 = "results/qc/{sample}_2.trimmed.fastq.gz"
+    output:
+        report = "results/kraken2/{sample}_kraken2.report",
+        output = temp("results/kraken2/{sample}_kraken2.output")
+    threads: 8
     params:
         db = "databases/kraken2_std_8gb"
     shell:
         "kraken2 --db {params.db} --threads {threads} --report {output.report} --paired {input.r1} {input.r2} > {output.output}"
 
 rule bracken:
-      input:
+    input:
         report = "results/kraken2/{sample}_kraken2.report"
     output:
         abundances = "results/bracken/{sample}_bracken.tsv"
